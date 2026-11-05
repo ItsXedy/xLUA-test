@@ -54,7 +54,7 @@ minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
 minimizeBtn.BorderSizePixel = 0
 minimizeBtn.Text = "-"
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeBtn.TextSize = 14 -- Fixed: removed the bad getmetatable line
+minimizeBtn.TextSize = 14
 minimizeBtn.Font = Enum.Font.GothamBold
 minimizeBtn.Parent = mainFrame
 
@@ -172,7 +172,7 @@ minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     container.Visible = not isMinimized
     mainFrame.Size = isMinimized and UDim2.new(0, 240, 0, 35) or UDim2.new(0, 240, 0, 210)
-    minimizeBtn.Text = isMinimized and "+" : "-"
+    minimizeBtn.Text = isMinimized and "+" or "-"
 end)
 
 -- Destroy Functionality
@@ -201,15 +201,6 @@ local function autoMineLoop()
                     
                     if primaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                         statusLabel.Text = "Mining rock in: " .. selectedZoneName
-                        
-                        -- Optional position adjustment or remote firing hook
-                        -- player.Character.HumanoidRootPart.CFrame = primaryPart.CFrame + Vector3.new(0, 3, 0)
-                        
-                        -- If you have a specific MineRock remote found in your dump, fire it here:
-                        -- local remotes = ReplicatedStorage:FindFirstChild("Remotes")
-                        -- if remotes and remotes:FindFirstChild("MineRock") then
-                        --     remotes.MineRock:FireServer(targetRock)
-                        -- end
                     end
                 else
                     statusLabel.Text = "Status: No rocks found in " .. selectedZoneName
