@@ -1,4 +1,4 @@
--- Auto-Mine & Zone Teleport GUI for Delta (Static Zone List)
+-- Auto-Mine & Zone Teleport GUI for Delta (With Active Teleportation)
 -- Target Path: workspace.Zones.[ZoneName].Rocks.Rock
 
 local Players = game:GetService("Players")
@@ -162,7 +162,7 @@ statusLabel.Parent = container
 local selectedZoneName = nil
 local isAutoMining = false
 
--- Populate the scrollable list using the static array
+-- Populate scrollable list
 local function buildStaticZoneList()
     for _, child in ipairs(dropdownFrame:GetChildren()) do
         if child:IsA("TextButton") then
@@ -186,7 +186,6 @@ local function buildStaticZoneList()
         btnUICorner.CornerRadius = UDim.new(0, 4)
         btnUICorner.Parent = zoneBtn
         
-        -- When a zone is clicked
         zoneBtn.MouseButton1Click:Connect(function()
             selectedZoneName = zoneName
             zoneSelectBtn.Text = "Zone: " .. selectedZoneName
@@ -198,7 +197,6 @@ end
 
 buildStaticZoneList()
 
--- Toggle dropdown menu
 zoneSelectBtn.MouseButton1Click:Connect(function()
     dropdownFrame.Visible = not dropdownFrame.Visible
     if dropdownFrame.Visible then
@@ -208,7 +206,6 @@ zoneSelectBtn.MouseButton1Click:Connect(function()
     end
 end)
 
--- Minimize Functionality
 local isMinimized = false
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
@@ -218,12 +215,11 @@ minimizeBtn.MouseButton1Click:Connect(function()
     minimizeBtn.Text = isMinimized and "+" or "-"
 end)
 
--- Destroy Functionality
 destroyBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Core Auto-Mine Loop targeting workspace.Zones.[ZoneName].Rocks
+-- Core Auto-Mine Teleport Loop
 local function autoMineLoop()
     task.spawn(function()
         while isAutoMining do
@@ -244,15 +240,17 @@ local function autoMineLoop()
                     
                     if primaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
                         statusLabel.Text = "Mining in: " .. selectedZoneName
+                        -- ACTUALLY TELEPORT CHARACTER TO THE ROCK
+                        player.Character.HumanoidRootPart.CFrame = primaryPart.CFrame + Vector3.new(0, 3, 0)
                     end
                 else
                     statusLabel.Text = "Status: No rocks in " .. selectedZoneName
                 end
             else
-                statusLabel.Text = "Status: 'Rocks' missing in zone"
+                statusLabel.Text = "Status: 'Rocks' folder missing"
             end
             
-            task.wait(0.5)
+            task.wait(0.4)
         end
         statusLabel.Text = "Status: Idle"
     end)
@@ -271,4 +269,4 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Auto-Mine GUI loaded with static zone list!")
+print("Auto-Mine script updated with active teleportation!")
