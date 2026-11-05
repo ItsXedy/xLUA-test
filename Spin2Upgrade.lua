@@ -1,9 +1,9 @@
--- Auto-Mine & Zone Teleport GUI for Delta (With Active Teleportation)
--- Target Path: workspace.Zones.[ZoneName].Rocks.Rock
-
+-- Auto-Mine & AFK Bypass GUI for Delta
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
+local TweenService = game:GetService("TweenService")
+local VirtualInputManager = game:GetService("VirtualInputManager") -- Used for safe UI clicking
 
 local player = Players.LocalPlayer
 local zonesFolder = Workspace:WaitForChild("Zones", 5)
@@ -161,15 +161,13 @@ statusLabel.Parent = container
 -- Logic variables
 local selectedZoneName = nil
 local isAutoMining = false
+local activeTween = nil
 
 -- Populate scrollable list
 local function buildStaticZoneList()
     for _, child in ipairs(dropdownFrame:GetChildren()) do
-        if child:IsA("TextButton") then
-            child:Destroy()
-        end
+        if child:IsA("TextButton") then child:Destroy() end
     end
-    
     for _, zoneName in ipairs(staticZones) do
         local zoneBtn = Instance.new("TextButton")
         zoneBtn.Size = UDim2.new(1, 0, 0, 28)
@@ -199,16 +197,11 @@ buildStaticZoneList()
 
 zoneSelectBtn.MouseButton1Click:Connect(function()
     dropdownFrame.Visible = not dropdownFrame.Visible
-    if dropdownFrame.Visible then
-        toggleBtn.Position = UDim2.new(0.05, 0, 0.72, 0)
-    else
-        toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
-    end
+    toggleBtn.Position = dropdownFrame.Visible and UDim2.new(0.05, 0, 0.72, 0) or UDim2.new(0.05, 0, 0.38, 0)
 end)
 
-local isMinimized = false
 minimizeBtn.MouseButton1Click:Connect(function()
-    isMinimized = not isMinimized
+    local isMinimized = container.Visible
     container.Visible = not isMinimized
     dropdownFrame.Visible = false
     mainFrame.Size = isMinimized and UDim2.new(0, 240, 0, 35) or UDim2.new(0, 240, 0, 210)
@@ -216,15 +209,100 @@ minimizeBtn.MouseButton1Click:Connect(function()
 end)
 
 destroyBtn.MouseButton1Click:Connect(function()
+    if activeTween then activeTween:Cancel() end
     screenGui:Destroy()
 end)
 
--- Core Auto-Mine Teleport Loop
-local function autoMineLoop()
+-- Tool Activation Helper
+local function triggerMine()
+    local char = player.Character
+    if not char then return end
+    
+    local tool = char:FindFirstChildOfClass("Tool")
+    if tool then
+        tool:Activate()
+    else
+        local backpack = player:FindFirstChildOfClass("Backpack")
+        local backpackTool = backpack and backpack:FindFirstChildOfClass("Tool")
+        if backpackTool and char:FindFirstChild("Humanoid") then
+            char.Humanoid:EquipTool(backpackTool)
+            backpackTool:Activate()
+        end
+    end
+end
+
+-- Smooth Movement Tween
+local function smoothMoveTo(targetCFrame)
+    local char = player.Character
+    if not char then return end
+    local hrp = char:FindFirstChild("HumanoidRootPart")
+    if not hrp then return end
+    
+    if activeTween then activeTween:Cancel() end
+    
+    local distance = (hrp.Position - targetCFrame.Position).Magnitude
+    local speed = 45 
+    local duration = math.clamp(distance / speed, 0.1, 1.5)
+    
+    local tweenInfo = TweenInfo.new(duration, Enum.EasingStyle.Linear, Enum.EasingDirection.Out)
+    activeTween = TweenService:Create(hrp, tweenInfo, {CFrame = targetCFrame})
+    activeTween:Play()
+end
+
+-- AFK Bypass Loop (Runs independently in background while Auto-Mining is ON)
+local function startAfkBypassLoop()
     task.spawn(function()
         while isAutoMining do
+            -- Wait 5 minutes (300 seconds)
+            for _ = 1, 300 do
+                if not isAutoMining then break end
+                task.wait(1)
+            end
+            
+            if not isAutoMining then break end
+            
+            -- Find the Settings button/icon path
+            local pGui = player:FindFirstChild("PlayerGui")
+            local targetObj = pGui and pGui:FindFirstChild("Hud") 
+                and pGui.Hud:FindFirstChild("TopRight") 
+                and pGui.Hud.TopRight:FindFirstChild("Dock") 
+                and pGui.Hud.TopRight.Dock:FindFirstChild("Settings") 
+                and pGui.Hud.TopRight.Dock.Settings:FindFirstChild("Badge")
+                and pGui.Hud.TopRight.Dock.Settings.Badge:FindFirstChild("Icon")
+                and pGui.Hud.TopRight.Dock.Settings.Badge.Icon:FindFirstChild("Image")
+            
+            local clickableParent = targetObj and targetObj.Parent -- Usually the ImageButton itself
+            
+            if clickableParent and (clickableParent:IsA("GuiButton") or clickableParent:IsA("ImageButton") or clickableParent:IsA("TextButton")) then
+                print("AFK Bypass: Triggering anti-AFK clicks...")
+                -- Click 2 times
+                for i = 1, 2 do
+                    local absPos = clickableParent.AbsolutePosition
+                    local absSize = clickableParent.AbsoluteSize
+                    local clickX = absPos.X + (absSize.X / 2)
+                    local clickY = absPos.Y + (absSize.Y / 2)
+                    
+                    VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
+                    task.wait(0.05)
+                    VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
+                    
+                    if i < 2 then task.wait(0.5) end
+                end
+            else
+                print("AFK Bypass Warning: Settings icon path not found at moment of click.")
+            end
+        end
+    end)
+end
+
+-- Core Auto-Mine Loop
+local function autoMineLoop()
+    task.spawn(function()
+        local currentTargetRock = nil
+        
+        while isAutoMining do
             if not selectedZoneName then
-                statusLabel.Text = "Status: Select a Zone first!"
+                statusLabel.Text = "Select a Zone!"
                 task.wait(1)
                 continue
             end
@@ -234,39 +312,52 @@ local function autoMineLoop()
             
             if rocksFolder then
                 local rocks = rocksFolder:GetChildren()
-                if #rocks > 0 then
-                    local targetRock = rocks[math.random(1, #rocks)]
-                    local primaryPart = targetRock:IsA("Model") and (targetRock.PrimaryPart or targetRock:FindFirstChildWhichIsA("BasePart")) or targetRock
+                local targetExists = false
+                if currentTargetRock and currentTargetRock.Parent == rocksFolder then
+                    targetExists = true
+                else
+                    currentTargetRock = nil
+                end
+                
+                if not targetExists and #rocks > 0 then
+                    currentTargetRock = rocks[math.random(1, #rocks)]
+                end
+                
+                if currentTargetRock then
+                    local primaryPart = currentTargetRock:IsA("Model") and (currentTargetRock.PrimaryPart or currentTargetRock:FindFirstChildWhichIsA("BasePart")) or currentTargetRock
                     
                     if primaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        statusLabel.Text = "Mining in: " .. selectedZoneName
-                        -- ACTUALLY TELEPORT CHARACTER TO THE ROCK
-                        player.Character.HumanoidRootPart.CFrame = primaryPart.CFrame + Vector3.new(0, 3, 0)
+                        statusLabel.Text = "Mining: " .. selectedZoneName
+                        smoothMoveTo(primaryPart.CFrame + Vector3.new(0, 3, 0))
+                        task.wait(0.2)
+                        triggerMine()
                     end
                 else
-                    statusLabel.Text = "Status: No rocks in " .. selectedZoneName
+                    statusLabel.Text = "No rocks available"
                 end
             else
-                statusLabel.Text = "Status: 'Rocks' folder missing"
+                statusLabel.Text = "Rocks folder missing"
             end
             
-            task.wait(0.4)
+            task.wait(0.3)
         end
+        
+        if activeTween then activeTween:Cancel() end
         statusLabel.Text = "Status: Idle"
     end)
 end
 
 toggleBtn.MouseButton1Click:Connect(function()
     isAutoMining = not isAutoMining
-    
     if isAutoMining then
         toggleBtn.Text = "Auto-Mine: ON"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
         autoMineLoop()
+        startAfkBypassLoop() -- Starts the 5-minute timer loop for anti-AFK
     else
         toggleBtn.Text = "Auto-Mine: OFF"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 end)
 
-print("Auto-Mine script updated with active teleportation!")
+print("Auto-Mine & Anti-AFK Script Loaded!")
