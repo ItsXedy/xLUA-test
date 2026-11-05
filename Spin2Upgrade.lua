@@ -54,8 +54,7 @@ minimizeBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
 minimizeBtn.BorderSizePixel = 0
 minimizeBtn.Text = "-"
 minimizeBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-minimizeBtn.TextSize:getmetatable = nil
-minimizeBtn.TextSize = 14
+minimizeBtn.TextSize = 14 -- Fixed: removed the bad getmetatable line
 minimizeBtn.Font = Enum.Font.GothamBold
 minimizeBtn.Parent = mainFrame
 
