@@ -1,4 +1,4 @@
--- Auto-Mine & Zone Teleport GUI for Delta
+-- Auto-Mine & Zone Teleport GUI for Delta (Static Zone List)
 -- Target Path: workspace.Zones.[ZoneName].Rocks.Rock
 
 local Players = game:GetService("Players")
@@ -6,10 +6,16 @@ local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
-local playerGui = player:WaitForChild("PlayerGui")
-
--- Safely get the Zones folder
 local zonesFolder = Workspace:WaitForChild("Zones", 5)
+
+-- Static list of all known mines in the game
+local staticZones = {
+    "Atlantis", "BlackHole", "Celestial", "Clockwork", 
+    "Crypt", "Dragon", "Genesis", "Glacier", 
+    "Glitch", "Grotto", "Mine1", "Mine2", 
+    "Mine3", "Mine4", "Mine5", "Mine6", 
+    "Moon", "Neon", "Sky", "Tomb", "Toxic"
+}
 
 -- Prevent duplicate GUIs
 if CoreGui:FindFirstChild("AutoMineGUI") then
@@ -156,62 +162,44 @@ statusLabel.Parent = container
 local selectedZoneName = nil
 local isAutoMining = false
 
--- Populate the scrollable list by scanning workspace.Zones children
-local function buildZoneList()
-    -- Clear previous items
+-- Populate the scrollable list using the static array
+local function buildStaticZoneList()
     for _, child in ipairs(dropdownFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
     
-    if not zonesFolder then
-        zoneSelectBtn.Text = "Zones Folder Missing!"
-        return
-    end
-    
-    local count = 0
-    for _, item in ipairs(zonesFolder:GetChildren()) do
-        if item:IsA("Folder") or item:IsA("Model") then
-            -- Verify it has a 'Rocks' folder inside it
-            if item:FindFirstChild("Rocks") then
-                count = count + 1
-                local zoneBtn = Instance.new("TextButton")
-                zoneBtn.Size = UDim2.new(1, 0, 0, 28)
-                zoneBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
-                zoneBtn.BorderSizePixel = 0
-                zoneBtn.Text = item.Name
-                zoneBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
-                zoneBtn.TextSize = 11
-                zoneBtn.Font = Enum.Font.Gotham
-                zoneBtn.ZIndex = 6
-                zoneBtn.Parent = dropdownFrame
-                
-                local btnUICorner = Instance.new("UICorner")
-                btnUICorner.CornerRadius = UDim.new(0, 4)
-                btnUICorner.Parent = zoneBtn
-                
-                -- When a zone is clicked
-                zoneBtn.MouseButton1Click:Connect(function()
-                    selectedZoneName = item.Name
-                    zoneSelectBtn.Text = "Zone: " .. selectedZoneName
-                    dropdownFrame.Visible = false
-                    toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
-                end)
-            end
-        end
-    end
-    
-    if count == 0 then
-        zoneSelectBtn.Text = "No Mines Found in Zones"
+    for _, zoneName in ipairs(staticZones) do
+        local zoneBtn = Instance.new("TextButton")
+        zoneBtn.Size = UDim2.new(1, 0, 0, 28)
+        zoneBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+        zoneBtn.BorderSizePixel = 0
+        zoneBtn.Text = zoneName
+        zoneBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+        zoneBtn.TextSize = 11
+        zoneBtn.Font = Enum.Font.Gotham
+        zoneBtn.ZIndex = 6
+        zoneBtn.Parent = dropdownFrame
+        
+        local btnUICorner = Instance.new("UICorner")
+        btnUICorner.CornerRadius = UDim.new(0, 4)
+        btnUICorner.Parent = zoneBtn
+        
+        -- When a zone is clicked
+        zoneBtn.MouseButton1Click:Connect(function()
+            selectedZoneName = zoneName
+            zoneSelectBtn.Text = "Zone: " .. selectedZoneName
+            dropdownFrame.Visible = false
+            toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
+        end)
     end
 end
 
-buildZoneList()
+buildStaticZoneList()
 
 -- Toggle dropdown menu
 zoneSelectBtn.MouseButton1Click:Connect(function()
-    buildZoneList()
     dropdownFrame.Visible = not dropdownFrame.Visible
     if dropdownFrame.Visible then
         toggleBtn.Position = UDim2.new(0.05, 0, 0.72, 0)
@@ -283,4 +271,4 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Auto-Mine GUI updated for workspace.Zones structure!")
+print("Auto-Mine GUI loaded with static zone list!")
