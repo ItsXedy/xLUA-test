@@ -1,4 +1,5 @@
--- Auto-Mine & Zone Teleport GUI for Delta (With Scrollable Zone List)
+-- Auto-Mine & Zone Teleport GUI for Delta
+-- Target Path: workspace.Zones.[ZoneName].Rocks.Rock
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -6,6 +7,9 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
+
+-- Safely get the Zones folder
+local zonesFolder = Workspace:WaitForChild("Zones", 5)
 
 -- Prevent duplicate GUIs
 if CoreGui:FindFirstChild("AutoMineGUI") then
@@ -89,7 +93,7 @@ zoneSelectBtn.Size = UDim2.new(0.9, 0, 0, 32)
 zoneSelectBtn.Position = UDim2.new(0.05, 0, 0.05, 0)
 zoneSelectBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 zoneSelectBtn.BorderSizePixel = 0
-zoneSelectBtn.Text = "Select Zone: [None]"
+zoneSelectBtn.Text = "Select Zone: [Click]"
 zoneSelectBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
 zoneSelectBtn.TextSize = 11
 zoneSelectBtn.Font = Enum.Font.Gotham
@@ -152,23 +156,24 @@ statusLabel.Parent = container
 local selectedZoneName = nil
 local isAutoMining = false
 
-local ignoreList = {
-    ["Camera"] = true, ["Terrain"] = true, ["Players"] = true, 
-    ["Lighting"] = true, ["MaterialFolders"] = true, ["SoundService"] = true
-}
-
--- Populate the scrollable list with all valid mines found in Workspace
+-- Populate the scrollable list by scanning workspace.Zones children
 local function buildZoneList()
-    -- Clear previous items in dropdown
+    -- Clear previous items
     for _, child in ipairs(dropdownFrame:GetChildren()) do
         if child:IsA("TextButton") then
             child:Destroy()
         end
     end
     
+    if not zonesFolder then
+        zoneSelectBtn.Text = "Zones Folder Missing!"
+        return
+    end
+    
     local count = 0
-    for _, item in ipairs(Workspace:GetChildren()) do
-        if (item:IsA("Folder") or item:IsA("Model")) and not ignoreList[item.Name] then
+    for _, item in ipairs(zonesFolder:GetChildren()) do
+        if item:IsA("Folder") or item:IsA("Model") then
+            -- Verify it has a 'Rocks' folder inside it
             if item:FindFirstChild("Rocks") then
                 count = count + 1
                 local zoneBtn = Instance.new("TextButton")
@@ -186,12 +191,11 @@ local function buildZoneList()
                 btnUICorner.CornerRadius = UDim.new(0, 4)
                 btnUICorner.Parent = zoneBtn
                 
-                -- When a mine is clicked from the list
+                -- When a zone is clicked
                 zoneBtn.MouseButton1Click:Connect(function()
                     selectedZoneName = item.Name
                     zoneSelectBtn.Text = "Zone: " .. selectedZoneName
                     dropdownFrame.Visible = false
-                    -- Shift toggle button down when menu closes
                     toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
                 end)
             end
@@ -199,13 +203,13 @@ local function buildZoneList()
     end
     
     if count == 0 then
-        zoneSelectBtn.Text = "No Mines Found"
+        zoneSelectBtn.Text = "No Mines Found in Zones"
     end
 end
 
 buildZoneList()
 
--- Toggle dropdown menu open/closed
+-- Toggle dropdown menu
 zoneSelectBtn.MouseButton1Click:Connect(function()
     buildZoneList()
     dropdownFrame.Visible = not dropdownFrame.Visible
@@ -231,7 +235,7 @@ destroyBtn.MouseButton1Click:Connect(function()
     screenGui:Destroy()
 end)
 
--- Core Auto-Mine Loop
+-- Core Auto-Mine Loop targeting workspace.Zones.[ZoneName].Rocks
 local function autoMineLoop()
     task.spawn(function()
         while isAutoMining do
@@ -241,8 +245,8 @@ local function autoMineLoop()
                 continue
             end
             
-            local zoneFolder = Workspace:FindFirstChild(selectedZoneName)
-            local rocksFolder = zoneFolder and zoneFolder:FindFirstChild("Rocks")
+            local targetZoneFolder = zonesFolder and zonesFolder:FindFirstChild(selectedZoneName)
+            local rocksFolder = targetZoneFolder and targetZoneFolder:FindFirstChild("Rocks")
             
             if rocksFolder then
                 local rocks = rocksFolder:GetChildren()
@@ -251,13 +255,13 @@ local function autoMineLoop()
                     local primaryPart = targetRock:IsA("Model") and (targetRock.PrimaryPart or targetRock:FindFirstChildWhichIsA("BasePart")) or targetRock
                     
                     if primaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        statusLabel.Text = "Targeting rock in: " + selectedZoneName
+                        statusLabel.Text = "Mining in: " .. selectedZoneName
                     end
                 else
                     statusLabel.Text = "Status: No rocks in " .. selectedZoneName
                 end
             else
-                statusLabel.Text = "Status: 'Rocks' missing in " .. selectedZoneName
+                statusLabel.Text = "Status: 'Rocks' missing in zone"
             end
             
             task.wait(0.5)
@@ -279,4 +283,4 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Auto-Mine GUI updated with scrollable list!")
+print("Auto-Mine GUI updated for workspace.Zones structure!")
