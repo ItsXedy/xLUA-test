@@ -1,5 +1,4 @@
--- Auto-Mine & Zone Teleport GUI for Delta
--- Target Path: workspace.[ZoneName].Rocks.Rock
+-- Auto-Mine & Zone Teleport GUI for Delta (With Scrollable Zone List)
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -84,13 +83,13 @@ container.Position = UDim2.new(0, 0, 0.2, 0)
 container.BackgroundTransparency = 1
 container.Parent = mainFrame
 
--- Zone Dropdown / Selection Box (Dynamic)
+-- Zone Dropdown Main Button
 local zoneSelectBtn = Instance.new("TextButton")
 zoneSelectBtn.Size = UDim2.new(0.9, 0, 0, 32)
 zoneSelectBtn.Position = UDim2.new(0.05, 0, 0.05, 0)
 zoneSelectBtn.BackgroundColor3 = Color3.fromRGB(45, 45, 50)
 zoneSelectBtn.BorderSizePixel = 0
-zoneSelectBtn.Text = "Select Zone: [Click to Scan]"
+zoneSelectBtn.Text = "Select Zone: [None]"
 zoneSelectBtn.TextColor3 = Color3.fromRGB(220, 220, 220)
 zoneSelectBtn.TextSize = 11
 zoneSelectBtn.Font = Enum.Font.Gotham
@@ -100,10 +99,32 @@ local zoneCorner = Instance.new("UICorner")
 zoneCorner.CornerRadius = UDim.new(0, 6)
 zoneCorner.Parent = zoneSelectBtn
 
+-- Popup Scrolling Frame for Zone List
+local dropdownFrame = Instance.new("ScrollingFrame")
+dropdownFrame.Size = UDim2.new(0.9, 0, 0, 120)
+dropdownFrame.Position = UDim2.new(0.05, 0, 0.4, 0)
+dropdownFrame.BackgroundColor3 = Color3.fromRGB(35, 35, 40)
+dropdownFrame.BorderSizePixel = 0
+dropdownFrame.Visible = false
+dropdownFrame.CanvasSize = UDim2.new(0, 0, 0, 0)
+dropdownFrame.AutomaticCanvasSize = Enum.AutomaticSize.Y
+dropdownFrame.ScrollBarThickness = 4
+dropdownFrame.ZIndex = 5
+dropdownFrame.Parent = container
+
+local dropCorner = Instance.new("UICorner")
+dropCorner.CornerRadius = UDim.new(0, 6)
+dropCorner.Parent = dropdownFrame
+
+local uiListLayout = Instance.new("UIListLayout")
+uiListLayout.SortOrder = Enum.SortOrder.LayoutOrder
+uiListLayout.Padding = UDim.new(0, 3)
+uiListLayout.Parent = dropdownFrame
+
 -- Toggle Auto-Mine Button
 local toggleBtn = Instance.new("TextButton")
 toggleBtn.Size = UDim2.new(0.9, 0, 0, 35)
-toggleBtn.Position = UDim2.new(0.05, 0, 0.35, 0)
+toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
 toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
 toggleBtn.BorderSizePixel = 0
 toggleBtn.Text = "Auto-Mine: OFF"
@@ -130,45 +151,68 @@ statusLabel.Parent = container
 -- Logic variables
 local selectedZoneName = nil
 local isAutoMining = false
-local zoneList = {}
-local currentZoneIndex = 1
 
--- List of known non-zone items in workspace to ignore during scanning
 local ignoreList = {
     ["Camera"] = true, ["Terrain"] = true, ["Players"] = true, 
     ["Lighting"] = true, ["MaterialFolders"] = true, ["SoundService"] = true
 }
 
--- Dynamically fetch available zones directly from Workspace
-local function refreshZones()
-    zoneList = {}
+-- Populate the scrollable list with all valid mines found in Workspace
+local function buildZoneList()
+    -- Clear previous items in dropdown
+    for _, child in ipairs(dropdownFrame:GetChildren()) do
+        if child:IsA("TextButton") then
+            child:Destroy()
+        end
+    end
+    
+    local count = 0
     for _, item in ipairs(Workspace:GetChildren()) do
         if (item:IsA("Folder") or item:IsA("Model")) and not ignoreList[item.Name] then
-            -- Check if it contains a 'Rocks' folder to confirm it's an actual mining zone
             if item:FindFirstChild("Rocks") then
-                table.insert(zoneList, item.Name)
+                count = count + 1
+                local zoneBtn = Instance.new("TextButton")
+                zoneBtn.Size = UDim2.new(1, 0, 0, 28)
+                zoneBtn.BackgroundColor3 = Color3.fromRGB(50, 50, 60)
+                zoneBtn.BorderSizePixel = 0
+                zoneBtn.Text = item.Name
+                zoneBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
+                zoneBtn.TextSize = 11
+                zoneBtn.Font = Enum.Font.Gotham
+                zoneBtn.ZIndex = 6
+                zoneBtn.Parent = dropdownFrame
+                
+                local btnUICorner = Instance.new("UICorner")
+                btnUICorner.CornerRadius = UDim.new(0, 4)
+                btnUICorner.Parent = zoneBtn
+                
+                -- When a mine is clicked from the list
+                zoneBtn.MouseButton1Click:Connect(function()
+                    selectedZoneName = item.Name
+                    zoneSelectBtn.Text = "Zone: " .. selectedZoneName
+                    dropdownFrame.Visible = false
+                    -- Shift toggle button down when menu closes
+                    toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
+                end)
             end
         end
     end
     
-    if #zoneList > 0 then
-        currentZoneIndex = 1
-        selectedZoneName = zoneList[currentZoneIndex]
-        zoneSelectBtn.Text = "Zone: " .. selectedZoneName
-    else
-        zoneSelectBtn.Text = "No Mining Zones Found"
+    if count == 0 then
+        zoneSelectBtn.Text = "No Mines Found"
     end
 end
 
-refreshZones()
+buildZoneList()
 
--- Cycle through zones on click
+-- Toggle dropdown menu open/closed
 zoneSelectBtn.MouseButton1Click:Connect(function()
-    refreshZones()
-    if #zoneList > 0 then
-        currentZoneIndex = currentZoneIndex % #zoneList + 1
-        selectedZoneName = zoneList[currentZoneIndex]
-        zoneSelectBtn.Text = "Zone: " .. selectedZoneName
+    buildZoneList()
+    dropdownFrame.Visible = not dropdownFrame.Visible
+    if dropdownFrame.Visible then
+        toggleBtn.Position = UDim2.new(0.05, 0, 0.72, 0)
+    else
+        toggleBtn.Position = UDim2.new(0.05, 0, 0.38, 0)
     end
 end)
 
@@ -177,6 +221,7 @@ local isMinimized = false
 minimizeBtn.MouseButton1Click:Connect(function()
     isMinimized = not isMinimized
     container.Visible = not isMinimized
+    dropdownFrame.Visible = false
     mainFrame.Size = isMinimized and UDim2.new(0, 240, 0, 35) or UDim2.new(0, 240, 0, 210)
     minimizeBtn.Text = isMinimized and "+" or "-"
 end)
@@ -206,10 +251,7 @@ local function autoMineLoop()
                     local primaryPart = targetRock:IsA("Model") and (targetRock.PrimaryPart or targetRock:FindFirstChildWhichIsA("BasePart")) or targetRock
                     
                     if primaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        statusLabel.Text = "Targeting rock in: " .. selectedZoneName
-                        
-                        -- Optional: Uncomment below if you want to teleport to the rock's position
-                        -- player.Character.HumanoidRootPart.CFrame = primaryPart.CFrame + Vector3.new(0, 3, 0)
+                        statusLabel.Text = "Targeting rock in: " + selectedZoneName
                     end
                 else
                     statusLabel.Text = "Status: No rocks in " .. selectedZoneName
@@ -237,4 +279,4 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Auto-Mine GUI initialized successfully!")
+print("Auto-Mine GUI updated with scrollable list!")
