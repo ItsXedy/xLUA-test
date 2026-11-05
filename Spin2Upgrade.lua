@@ -1,5 +1,5 @@
 -- Auto-Mine & Zone Teleport GUI for Delta
--- Target Path: workspace.Zones.[Area].Rocks.Rock
+-- Target Path: workspace.[ZoneName].Rocks.Rock
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
@@ -7,7 +7,6 @@ local Workspace = game:GetService("Workspace")
 
 local player = Players.LocalPlayer
 local playerGui = player:WaitForChild("PlayerGui")
-local zonesFolder = Workspace:WaitForChild("Zones", 5)
 
 -- Prevent duplicate GUIs
 if CoreGui:FindFirstChild("AutoMineGUI") then
@@ -78,7 +77,7 @@ local desCorner = Instance.new("UICorner")
 desCorner.CornerRadius = UDim.new(0, 4)
 desCorner.Parent = destroyBtn
 
--- Container for inner controls (so minimizing hides everything else)
+-- Container for inner controls
 local container = Instance.new("Frame")
 container.Size = UDim2.new(1, 0, 0.8, 0)
 container.Position = UDim2.new(0, 0, 0.2, 0)
@@ -134,13 +133,20 @@ local isAutoMining = false
 local zoneList = {}
 local currentZoneIndex = 1
 
--- Dynamically fetch available zones from workspace.Zones
+-- List of known non-zone items in workspace to ignore during scanning
+local ignoreList = {
+    ["Camera"] = true, ["Terrain"] = true, ["Players"] = true, 
+    ["Lighting"] = true, ["MaterialFolders"] = true, ["SoundService"] = true
+}
+
+-- Dynamically fetch available zones directly from Workspace
 local function refreshZones()
     zoneList = {}
-    if zonesFolder then
-        for _, zone in ipairs(zonesFolder:GetChildren()) do
-            if zone:IsA("Folder") or zone:IsA("Model") then
-                table.insert(zoneList, zone.Name)
+    for _, item in ipairs(Workspace:GetChildren()) do
+        if (item:IsA("Folder") or item:IsA("Model")) and not ignoreList[item.Name] then
+            -- Check if it contains a 'Rocks' folder to confirm it's an actual mining zone
+            if item:FindFirstChild("Rocks") then
+                table.insert(zoneList, item.Name)
             end
         end
     end
@@ -150,7 +156,7 @@ local function refreshZones()
         selectedZoneName = zoneList[currentZoneIndex]
         zoneSelectBtn.Text = "Zone: " .. selectedZoneName
     else
-        zoneSelectBtn.Text = "No Zones Found"
+        zoneSelectBtn.Text = "No Mining Zones Found"
     end
 end
 
@@ -190,23 +196,26 @@ local function autoMineLoop()
                 continue
             end
             
-            local zoneFolder = zonesFolder and zonesFolder:FindFirstChild(selectedZoneName)
+            local zoneFolder = Workspace:FindFirstChild(selectedZoneName)
             local rocksFolder = zoneFolder and zoneFolder:FindFirstChild("Rocks")
             
             if rocksFolder then
                 local rocks = rocksFolder:GetChildren()
                 if #rocks > 0 then
                     local targetRock = rocks[math.random(1, #rocks)]
-                    local primaryPart = targetRock:IsA("Model") and targetRock.PrimaryPart or targetRock:FindFirstChildWhichIsA("BasePart")
+                    local primaryPart = targetRock:IsA("Model") and (targetRock.PrimaryPart or targetRock:FindFirstChildWhichIsA("BasePart")) or targetRock
                     
                     if primaryPart and player.Character and player.Character:FindFirstChild("HumanoidRootPart") then
-                        statusLabel.Text = "Mining rock in: " .. selectedZoneName
+                        statusLabel.Text = "Targeting rock in: " .. selectedZoneName
+                        
+                        -- Optional: Uncomment below if you want to teleport to the rock's position
+                        -- player.Character.HumanoidRootPart.CFrame = primaryPart.CFrame + Vector3.new(0, 3, 0)
                     end
                 else
-                    statusLabel.Text = "Status: No rocks found in " .. selectedZoneName
+                    statusLabel.Text = "Status: No rocks in " .. selectedZoneName
                 end
             else
-                statusLabel.Text = "Status: 'Rocks' folder missing in zone"
+                statusLabel.Text = "Status: 'Rocks' missing in " .. selectedZoneName
             end
             
             task.wait(0.5)
