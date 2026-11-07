@@ -252,7 +252,7 @@ local function smoothMoveTo(targetCFrame)
     activeTween:Play()
 end
 
--- Function to execute 2 taps on the Settings button
+-- Function to execute 2 taps on the Settings button safely
 local function clickSettingsTwice()
     local pGui = player:FindFirstChild("PlayerGui")
     local settingsBtn = pGui and pGui:FindFirstChild("Hud")
@@ -260,7 +260,8 @@ local function clickSettingsTwice()
         and pGui.Hud.TopRight:FindFirstChild("Dock")
         and pGui.Hud.TopRight.Dock:FindFirstChild("Settings")
     
-    if settingsBtn then
+    if settingsBtn and settingsBtn.AbsoluteSize.X > 0 then
+        -- Recalculate fresh position right at the moment of clicking
         local pos = settingsBtn.AbsolutePosition
         local size = settingsBtn.AbsoluteSize
         local cx = pos.X + (size.X / 2)
@@ -278,9 +279,12 @@ local function clickSettingsTwice()
         task.wait(0.05)
         VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
         
-        print("Anti-AFK: Toggled Settings open and closed!")
+        print("Anti-AFK: Successfully clicked Settings at (" .. math.floor(cx) .. ", " .. math.floor(cy) .. ")")
     else
-        warn("Anti-AFK Warning: Settings button path not found.")
+        warn("Anti-AFK Warning: Settings button not visible or path invalid.")
+        -- Fallback: Engine idle reset so you don't get kicked even if the UI isn't found
+        VirtualUser:CaptureController()
+        VirtualUser:ClickButton2(Vector2.new())
     end
 end
 
