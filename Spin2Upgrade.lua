@@ -249,47 +249,51 @@ local function smoothMoveTo(targetCFrame)
     activeTween:Play()
 end
 
--- AFK Bypass Loop (Runs independently in background while Auto-Mining is ON)
+-- Anti-AFK Loop targeting the Settings TextButton/ImageButton
 local function startAfkBypassLoop()
     task.spawn(function()
+        -- Disable standard Roblox Idled kick connection
+        local GC = getconnections or get_hidden_connections
+        if GC then
+            for _, conn in pairs(GC(player.Idled)) do
+                if conn.Disable then conn:Disable() elseif conn.Disconnect then conn:Disconnect() end
+            end
+        else
+            player.Idled:Connect(function()
+                VirtualUser:CaptureController()
+                VirtualUser:ClickButton2(Vector2.new())
+            end)
+        end
+        
         while isAutoMining do
-            -- Wait 5 minutes (300 seconds)
-            for _ = 1, 300 do
+            -- Wait 4 minutes (240 seconds)
+            for _ = 1, 240 do
                 if not isAutoMining then break end
                 task.wait(1)
             end
             
             if not isAutoMining then break end
             
-            -- Find the Settings button/icon path
+            -- 1. Send Engine Input Ping
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+            
+            -- 2. Directly trigger the Settings button
             local pGui = player:FindFirstChild("PlayerGui")
-            local targetObj = pGui and pGui:FindFirstChild("Hud") 
-                and pGui.Hud:FindFirstChild("TopRight") 
-                and pGui.Hud.TopRight:FindFirstChild("Dock") 
-                and pGui.Hud.TopRight.Dock:FindFirstChild("Settings") 
-                and pGui.Hud.TopRight.Dock.Settings:FindFirstChild("Badge")
-                and pGui.Hud.TopRight.Dock.Settings.Badge:FindFirstChild("Icon")
-                and pGui.Hud.TopRight.Dock.Settings.Badge.Icon:FindFirstChild("Image")
+            local settingsBtn = pGui and pGui:FindFirstChild("Hud")
+                and pGui.Hud:FindFirstChild("TopRight")
+                and pGui.Hud.TopRight:FindFirstChild("Dock")
+                and pGui.Hud.TopRight.Dock:FindFirstChild("Settings")
             
-            local clickableParent = targetObj and targetObj.Parent -- Usually the ImageButton itself
-            
-            if clickableParent and (clickableParent:IsA("GuiButton") or clickableParent:IsA("ImageButton") or clickableParent:IsA("TextButton")) then
-                print("AFK Bypass: Triggering anti-AFK clicks...")
-                -- Click 2 times
-                for i = 1, 2 do
-                    local absPos = clickableParent.AbsolutePosition
-                    local absSize = clickableParent.AbsoluteSize
-                    local clickX = absPos.X + (absSize.X / 2)
-                    local clickY = absPos.Y + (absSize.Y / 2)
-                    
-                    VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, true, game, 1)
-                    task.wait(0.05)
-                    VirtualInputManager:SendMouseButtonEvent(clickX, clickY, 0, false, game, 1)
-                    
-                    if i < 2 then task.wait(0.5) end
+            if settingsBtn and settingsBtn:IsA("GuiButton") then
+                print("Anti-AFK: Clicking Settings button...")
+                -- Fire click twice (Open then Close)
+                for _ = 1, 2 do
+                    firesignal(settingsBtn.Activated)
+                    task.wait(0.4)
                 end
             else
-                print("AFK Bypass Warning: Settings icon path not found at moment of click.")
+                warn("Anti-AFK: Settings button not found at path!")
             end
         end
     end)
