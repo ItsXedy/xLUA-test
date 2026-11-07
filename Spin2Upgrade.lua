@@ -1,11 +1,10 @@
--- Auto-Mine & Anti-AFK GUI for Delta
+-- Auto-Mine & Anti-AFK Script for Delta
 -- Target Path: workspace.Zones.[ZoneName].Rocks.Rock
 
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
-local VirtualInputManager = game:GetService("VirtualInputManager")
 local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
@@ -252,50 +251,18 @@ local function smoothMoveTo(targetCFrame)
     activeTween:Play()
 end
 
--- Function to execute 2 taps on the Settings button safely
-local function clickSettingsTwice()
-    local pGui = player:FindFirstChild("PlayerGui")
-    local settingsBtn = pGui and pGui:FindFirstChild("Hud")
-        and pGui.Hud:FindFirstChild("TopRight")
-        and pGui.Hud.TopRight:FindFirstChild("Dock")
-        and pGui.Hud.TopRight.Dock:FindFirstChild("Settings")
-    
-    if settingsBtn and settingsBtn.AbsoluteSize.X > 0 then
-        -- Recalculate fresh position right at the moment of clicking
-        local pos = settingsBtn.AbsolutePosition
-        local size = settingsBtn.AbsoluteSize
-        local cx = pos.X + (size.X / 2)
-        local cy = pos.Y + (size.Y / 2)
-        
-        -- Tap 1 (Open Settings)
-        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
-        
-        task.wait(0.4) -- Delay between clicks
-        
-        -- Tap 2 (Close Settings)
-        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
-        task.wait(0.05)
-        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
-        
-        print("Anti-AFK: Successfully clicked Settings at (" .. math.floor(cx) .. ", " .. math.floor(cy) .. ")")
-    else
-        warn("Anti-AFK Warning: Settings button not visible or path invalid.")
-        -- Fallback: Engine idle reset so you don't get kicked even if the UI isn't found
-        VirtualUser:CaptureController()
-        VirtualUser:ClickButton2(Vector2.new())
-    end
-end
-
--- Anti-AFK Loop: Click 2x, then wait 4 minutes (repeats while Auto-Mine is ON)
+-- Anti-AFK Loop using proven firesignal double-tap
 local function startAfkBypassLoop()
     task.spawn(function()
-        -- Intercept standard Roblox idle signal
+        -- Intercept standard Roblox idle disconnect signal
         local GC = getconnections or get_hidden_connections
         if GC then
             for _, conn in pairs(GC(player.Idled)) do
-                if conn.Disable then conn:Disable() elseif conn.Disconnect then conn:Disconnect() end
+                if conn.Disable then 
+                    conn:Disable() 
+                elseif conn.Disconnect then 
+                    conn:Disconnect() 
+                end
             end
         else
             player.Idled:Connect(function()
@@ -304,13 +271,43 @@ local function startAfkBypassLoop()
             end)
         end
         
+        print("Anti-AFK System Initialized.")
+        
         while isAutoMining do
-            -- Perform double-click action
+            -- Engine Input Ping
             VirtualUser:CaptureController()
             VirtualUser:ClickButton2(Vector2.new())
-            clickSettingsTwice()
             
-            -- Wait 4 minutes (240 seconds) before the next double-click cycle
+            -- Find the verified Settings button path
+            local pGui = player:FindFirstChild("PlayerGui")
+            local settingsBtn = pGui and pGui:FindFirstChild("Hud")
+                and pGui.Hud:FindFirstChild("TopRight")
+                and pGui.Hud.TopRight:FindFirstChild("Dock")
+                and pGui.Hud.TopRight.Dock:FindFirstChild("Settings")
+            
+            if settingsBtn then
+                print("Anti-AFK: Executing double-click cycle on Settings...")
+                
+                -- Tap 1: Open Settings
+                if firesignal then
+                    pcall(function() firesignal(settingsBtn.Activated) end)
+                    pcall(function() firesignal(settingsBtn.MouseButton1Click) end)
+                end
+                
+                task.wait(0.5) -- Delay to let menu open
+                
+                -- Tap 2: Close Settings
+                if firesignal then
+                    pcall(function() firesignal(settingsBtn.Activated) end)
+                    pcall(function() firesignal(settingsBtn.MouseButton1Click) end)
+                end
+                
+                print("Anti-AFK: Double-click complete. Waiting 4 minutes...")
+            else
+                warn("Anti-AFK Warning: Settings button not found at path.")
+            end
+            
+            -- Wait 4 minutes (240 seconds) before the next cycle
             for _ = 1, 240 do
                 if not isAutoMining then break end
                 task.wait(1)
@@ -384,4 +381,4 @@ toggleBtn.MouseButton1Click:Connect(function()
     end
 end)
 
-print("Auto-Mine & Double-Click Anti-AFK Script Loaded!")
+print("Auto-Mine & Verified Anti-AFK Script Loaded Successfully!")
