@@ -1,9 +1,12 @@
--- Auto-Mine & AFK Bypass GUI for Delta
+-- Auto-Mine & Anti-AFK GUI for Delta
+-- Target Path: workspace.Zones.[ZoneName].Rocks.Rock
+
 local Players = game:GetService("Players")
 local CoreGui = game:GetService("CoreGui")
 local Workspace = game:GetService("Workspace")
 local TweenService = game:GetService("TweenService")
-local VirtualInputManager = game:GetService("VirtualInputManager") -- Used for safe UI clicking
+local VirtualInputManager = game:GetService("VirtualInputManager")
+local VirtualUser = game:GetService("VirtualUser")
 
 local player = Players.LocalPlayer
 local zonesFolder = Workspace:WaitForChild("Zones", 5)
@@ -249,10 +252,42 @@ local function smoothMoveTo(targetCFrame)
     activeTween:Play()
 end
 
--- Anti-AFK Loop targeting the Settings TextButton/ImageButton
+-- Function to execute 2 taps on the Settings button
+local function clickSettingsTwice()
+    local pGui = player:FindFirstChild("PlayerGui")
+    local settingsBtn = pGui and pGui:FindFirstChild("Hud")
+        and pGui.Hud:FindFirstChild("TopRight")
+        and pGui.Hud.TopRight:FindFirstChild("Dock")
+        and pGui.Hud.TopRight.Dock:FindFirstChild("Settings")
+    
+    if settingsBtn then
+        local pos = settingsBtn.AbsolutePosition
+        local size = settingsBtn.AbsoluteSize
+        local cx = pos.X + (size.X / 2)
+        local cy = pos.Y + (size.Y / 2)
+        
+        -- Tap 1 (Open Settings)
+        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
+        
+        task.wait(0.4) -- Delay between clicks
+        
+        -- Tap 2 (Close Settings)
+        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, true, game, 1)
+        task.wait(0.05)
+        VirtualInputManager:SendMouseButtonEvent(cx, cy, 0, false, game, 1)
+        
+        print("Anti-AFK: Toggled Settings open and closed!")
+    else
+        warn("Anti-AFK Warning: Settings button path not found.")
+    end
+end
+
+-- Anti-AFK Loop: Click 2x, then wait 4 minutes (repeats while Auto-Mine is ON)
 local function startAfkBypassLoop()
     task.spawn(function()
-        -- Disable standard Roblox Idled kick connection
+        -- Intercept standard Roblox idle signal
         local GC = getconnections or get_hidden_connections
         if GC then
             for _, conn in pairs(GC(player.Idled)) do
@@ -266,34 +301,15 @@ local function startAfkBypassLoop()
         end
         
         while isAutoMining do
-            -- Wait 4 minutes (240 seconds)
+            -- Perform double-click action
+            VirtualUser:CaptureController()
+            VirtualUser:ClickButton2(Vector2.new())
+            clickSettingsTwice()
+            
+            -- Wait 4 minutes (240 seconds) before the next double-click cycle
             for _ = 1, 240 do
                 if not isAutoMining then break end
                 task.wait(1)
-            end
-            
-            if not isAutoMining then break end
-            
-            -- 1. Send Engine Input Ping
-            VirtualUser:CaptureController()
-            VirtualUser:ClickButton2(Vector2.new())
-            
-            -- 2. Directly trigger the Settings button
-            local pGui = player:FindFirstChild("PlayerGui")
-            local settingsBtn = pGui and pGui:FindFirstChild("Hud")
-                and pGui.Hud:FindFirstChild("TopRight")
-                and pGui.Hud.TopRight:FindFirstChild("Dock")
-                and pGui.Hud.TopRight.Dock:FindFirstChild("Settings")
-            
-            if settingsBtn and settingsBtn:IsA("GuiButton") then
-                print("Anti-AFK: Clicking Settings button...")
-                -- Fire click twice (Open then Close)
-                for _ = 1, 2 do
-                    firesignal(settingsBtn.Activated)
-                    task.wait(0.4)
-                end
-            else
-                warn("Anti-AFK: Settings button not found at path!")
             end
         end
     end)
@@ -357,11 +373,11 @@ toggleBtn.MouseButton1Click:Connect(function()
         toggleBtn.Text = "Auto-Mine: ON"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(50, 200, 80)
         autoMineLoop()
-        startAfkBypassLoop() -- Starts the 5-minute timer loop for anti-AFK
+        startAfkBypassLoop()
     else
         toggleBtn.Text = "Auto-Mine: OFF"
         toggleBtn.BackgroundColor3 = Color3.fromRGB(200, 50, 50)
     end
 end)
 
-print("Auto-Mine & Anti-AFK Script Loaded!")
+print("Auto-Mine & Double-Click Anti-AFK Script Loaded!")
