@@ -7,7 +7,7 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/ref
 
 ### Replicated Storage dumpy
 ```
-loadstring(game:HttpGet(https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/RepliStorage.lua"))()
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/RepliStorage.lua"))()
 ```
 
 ### Spin to Upgrade
