@@ -5,6 +5,11 @@ just a comp of things slop
 loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/vulnerable.lua"))()
 ```
 
+### Replicated Storage dumpy
+```
+loadstring(game:HttpGet(https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/RepliStorage.lua"))()
+```
+
 ### Spin to Upgrade
 ```
 loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/Spin2Upgrade.lua"))()
