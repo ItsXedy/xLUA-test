@@ -1,6 +1,3 @@
--- Client-side Luau UI + Dumper for ReplicatedStorage & UI (including Remotes)
--- Intended for environments supporting filesystem globals (writefile / makefolder).
-
 local Players = game:GetService("Players")
 local ReplicatedStorage = game:GetService("ReplicatedStorage")
 local MarketplaceService = game:GetService("MarketplaceService")
@@ -30,7 +27,9 @@ local function sanitizeSegment(str)
 end
 
 local function ensureFolderPath(fullPath)
-	if not canWriteFiles then return end
+	if not canWriteFiles then
+		return
+	end
 	local parts = string.split(fullPath, "/")
 	local current = ""
 	for _, part in ipairs(parts) do
@@ -59,8 +58,10 @@ local function serializeValue(val)
 	elseif t == "UDim2" then
 		return {
 			_type = "UDim2",
-			xScale = val.X.Scale, xOffset = val.X.Offset,
-			yScale = val.Y.Scale, yOffset = val.Y.Offset,
+			xScale = val.X.Scale,
+			xOffset = val.X.Offset,
+			yScale = val.Y.Scale,
+			yOffset = val.Y.Offset,
 		}
 	elseif t == "UDim" then
 		return { _type = "UDim", scale = val.Scale, offset = val.Offset }
@@ -160,7 +161,6 @@ local function encodeJson(val, indent)
 			:gsub("\t", "\\t")
 		return '"' .. escaped .. '"'
 	elseif t == "table" then
-		-- Detect array vs map
 		local isArray = true
 		local count = 0
 		for k in pairs(val) do
@@ -252,7 +252,6 @@ local function runDump(customName, customBaseDir, includeReplicatedStorage, incl
 		}, 0))
 		statusLabel.Text = string.format("Saved %d remotes -> %s", #remotes, targetRoot)
 	else
-		-- Fallback if running in a restricted environment without writefile
 		pcall(function()
 			if setclipboard then
 				setclipboard(jsonText)
