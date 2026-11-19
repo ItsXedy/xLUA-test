@@ -7,6 +7,9 @@ local localPlayer = Players.LocalPlayer
 local playerGui = localPlayer:WaitForChild("PlayerGui")
 
 local hasFs = (typeof(writefile) == "function") and (typeof(makefolder) == "function")
+local decompileFn = (typeof(decompile) == "function" and decompile)
+	or (typeof(getscriptbytecode) == "function" and typeof(Decompile) == "function" and Decompile)
+	or nil
 
 local function safeName(text)
 	if type(text) ~= "string" or text == "" then
@@ -39,6 +42,24 @@ local function ensureDir(dirPath)
 			end
 		end
 	end
+end
+
+local function getScriptSource(scriptInst)
+	if decompileFn then
+		local okDec, res = pcall(decompileFn, scriptInst)
+		if okDec and type(res) == "string" and #res > 0 then
+			return res
+		end
+	end
+
+	local okSrc, src = pcall(function()
+		return scriptInst.Source
+	end)
+	if okSrc and type(src) == "string" and #src > 0 then
+		return src
+	end
+
+	return "-- [Could not read or decompile source on client]"
 end
 
 local function formatVal(v)
@@ -133,22 +154,16 @@ local function writeInstanceFile(folderPath, inst, stats)
 		stats.remotes += 1
 	elseif inst:IsA("ModuleScript") then
 		filePath = folderPath .. "/" .. base .. ".lua"
-		local okSrc, src = pcall(function()
-			return inst.Source
-		end)
-		content = buildHeader(inst) .. "\n" .. ((okSrc and type(src) == "string") and src or "-- [Source unavailable on client]")
+		content = buildHeader(inst) .. "\n" .. getScriptSource(inst) .. "\n"
+		stats.scripts += 1
 	elseif inst:IsA("LocalScript") then
 		filePath = folderPath .. "/" .. base .. ".client.lua"
-		local okSrc, src = pcall(function()
-			return inst.Source
-		end)
-		content = buildHeader(inst) .. "\n" .. ((okSrc and type(src) == "string") and src or "-- [Source unavailable on client]")
+		content = buildHeader(inst) .. "\n" .. getScriptSource(inst) .. "\n"
+		stats.scripts += 1
 	elseif inst:IsA("Script") then
 		filePath = folderPath .. "/" .. base .. ".server.lua"
-		local okSrc, src = pcall(function()
-			return inst.Source
-		end)
-		content = buildHeader(inst) .. "\n" .. ((okSrc and type(src) == "string") and src or "-- [Source unavailable on client]")
+		content = buildHeader(inst) .. "\n" .. getScriptSource(inst) .. "\n"
+		stats.scripts += 1
 	else
 		filePath = folderPath .. "/" .. base .. ".txt"
 		content = buildHeader(inst)
@@ -174,6 +189,10 @@ local function dumpTreeToFiles(rootInst, targetFolder, stats)
 		else
 			writeInstanceFile(currentFolder, inst, stats)
 		end
+
+		if (stats.files % 25) == 0 then
+			task.wait()
+		end
 	end
 
 	for _, child in ipairs(rootInst:GetChildren()) do
@@ -181,7 +200,7 @@ local function dumpTreeToFiles(rootInst, targetFolder, stats)
 	end
 end
 
-local function runFileDump(customName, baseFolder, statusLabel)
+local function runFileDump(customName, baseFolder, scopeMode, statusLabel)
 	if not hasFs then
 		statusLabel.Text = "Error: writefile / makefolder not available."
 		return
@@ -191,19 +210,25 @@ local function runFileDump(customName, baseFolder, statusLabel)
 	local gameFolder = getGameFolderName()
 	local rootBase = (baseFolder and baseFolder ~= "") and baseFolder:gsub("/+$", "") or "Dumps"
 
-	-- Layout: (base)/(name)/(game)/...
 	local outputRoot = string.format("%s/%s/%s", rootBase, cleanName, gameFolder)
 	ensureDir(outputRoot)
 
-	local stats = { files = 0, remotes = 0 }
+	local stats = { files = 0, remotes = 0, scripts = 0 }
 
-	statusLabel.Text = "Dumping ReplicatedStorage files..."
-	dumpTreeToFiles(ReplicatedStorage, outputRoot .. "/ReplicatedStorage", stats)
+	if scopeMode == "ReplicatedStorage" or scopeMode == "Both" then
+		statusLabel.Text = "Dumping ReplicatedStorage files..."
+		dumpTreeToFiles(ReplicatedStorage, outputRoot .. "/ReplicatedStorage", stats)
+	end
 
-	statusLabel.Text = "Dumping UI (PlayerGui) files..."
-	dumpTreeToFiles(playerGui, outputRoot .. "/PlayerGui", stats)
+	if scopeMode == "PlayerGui" or scopeMode == "Both" then
+		statusLabel.Text = "Dumping UI (PlayerGui) files..."
+		dumpTreeToFiles(playerGui, outputRoot .. "/PlayerGui", stats)
+	end
 
-	statusLabel.Text = string.format("Saved %d files (%d remotes) -> %s", stats.files, stats.remotes, outputRoot)
+	statusLabel.Text = string.format(
+		"[%s] Saved %d files (%d scripts, %d remotes) -> %s",
+		scopeMode, stats.files, stats.scripts, stats.remotes, outputRoot
+	)
 end
 
 -- UI
@@ -218,8 +243,8 @@ if not screenGui.Parent then
 end
 
 local frame = Instance.new("Frame")
-frame.Size = UDim2.new(0, 380, 0, 265)
-frame.Position = UDim2.new(0.5, -190, 0.5, -132)
+frame.Size = UDim2.new(0, 380, 0, 305)
+frame.Position = UDim2.new(0.5, -190, 0.5, -152)
 frame.BackgroundColor3 = Color3.fromRGB(26, 28, 34)
 frame.BorderSizePixel = 0
 frame.Active = true
@@ -242,8 +267,8 @@ title.TextXAlignment = Enum.TextXAlignment.Left
 title.Parent = frame
 
 local nameBox = Instance.new("TextBox")
-nameBox.Size = UDim2.new(1, -20, 0, 34)
-nameBox.Position = UDim2.new(0, 10, 0, 44)
+nameBox.Size = UDim2.new(1, -20, 0, 32)
+nameBox.Position = UDim2.new(0, 10, 0, 42)
 nameBox.BackgroundColor3 = Color3.fromRGB(38, 41, 50)
 nameBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 nameBox.PlaceholderText = "Custom (name)"
@@ -254,8 +279,8 @@ nameBox.ClearTextOnFocus = false
 nameBox.Parent = frame
 
 local dirBox = Instance.new("TextBox")
-dirBox.Size = UDim2.new(1, -20, 0, 34)
-dirBox.Position = UDim2.new(0, 10, 0, 86)
+dirBox.Size = UDim2.new(1, -20, 0, 32)
+dirBox.Position = UDim2.new(0, 10, 0, 80)
 dirBox.BackgroundColor3 = Color3.fromRGB(38, 41, 50)
 dirBox.TextColor3 = Color3.fromRGB(255, 255, 255)
 dirBox.PlaceholderText = "Base directory (e.g. Dumps)"
@@ -265,9 +290,61 @@ dirBox.TextSize = 13
 dirBox.ClearTextOnFocus = false
 dirBox.Parent = frame
 
+-- Scope selector buttons: PlayerGui Only | ReplicatedStorage Only | Both
+local selectedScope = "Both"
+local scopeModes = {
+	{ id = "PlayerGui", label = "PlayerGui Only" },
+	{ id = "ReplicatedStorage", label = "RS Only" },
+	{ id = "Both", label = "Both" },
+}
+local scopeButtons = {}
+
+local scopeRow = Instance.new("Frame")
+scopeRow.Size = UDim2.new(1, -20, 0, 32)
+scopeRow.Position = UDim2.new(0, 10, 0, 118)
+scopeRow.BackgroundTransparency = 1
+scopeRow.Parent = frame
+
+local rowLayout = Instance.new("UIListLayout")
+rowLayout.FillDirection = Enum.FillDirection.Horizontal
+rowLayout.HorizontalAlignment = Enum.HorizontalAlignment.Center
+rowLayout.Padding = UDim.new(0, 6)
+rowLayout.Parent = scopeRow
+
+local function refreshScopeButtons()
+	for _, item in ipairs(scopeButtons) do
+		local active = (item.id == selectedScope)
+		item.button.BackgroundColor3 = active and Color3.fromRGB(64, 130, 246) or Color3.fromRGB(44, 48, 58)
+		item.button.TextColor3 = active and Color3.fromRGB(255, 255, 255) or Color3.fromRGB(185, 195, 210)
+	end
+end
+
+for _, mode in ipairs(scopeModes) do
+	local btn = Instance.new("TextButton")
+	btn.Size = UDim2.new(1 / 3, -4, 1, 0)
+	btn.BackgroundColor3 = Color3.fromRGB(44, 48, 58)
+	btn.TextColor3 = Color3.fromRGB(185, 195, 210)
+	btn.Text = mode.label
+	btn.Font = Enum.Font.GothamBold
+	btn.TextSize = 11
+	btn.Parent = scopeRow
+
+	local btnCorner = Instance.new("UICorner")
+	btnCorner.CornerRadius = UDim.new(0, 6)
+	btnCorner.Parent = btn
+
+	btn.MouseButton1Click:Connect(function()
+		selectedScope = mode.id
+		refreshScopeButtons()
+	end)
+
+	table.insert(scopeButtons, { id = mode.id, button = btn })
+end
+refreshScopeButtons()
+
 local preview = Instance.new("TextLabel")
-preview.Size = UDim2.new(1, -20, 0, 34)
-preview.Position = UDim2.new(0, 10, 0, 126)
+preview.Size = UDim2.new(1, -20, 0, 32)
+preview.Position = UDim2.new(0, 10, 0, 156)
 preview.BackgroundTransparency = 1
 preview.TextColor3 = Color3.fromRGB(165, 175, 190)
 preview.Font = Enum.Font.Code
@@ -287,7 +364,7 @@ updatePreview()
 
 local dumpBtn = Instance.new("TextButton")
 dumpBtn.Size = UDim2.new(1, -20, 0, 38)
-dumpBtn.Position = UDim2.new(0, 10, 0, 168)
+dumpBtn.Position = UDim2.new(0, 10, 0, 196)
 dumpBtn.BackgroundColor3 = Color3.fromRGB(64, 130, 246)
 dumpBtn.TextColor3 = Color3.fromRGB(255, 255, 255)
 dumpBtn.Text = "Dump Files & Folders"
@@ -296,22 +373,24 @@ dumpBtn.TextSize = 13
 dumpBtn.Parent = frame
 
 local statusLabel = Instance.new("TextLabel")
-statusLabel.Size = UDim2.new(1, -20, 0, 40)
-statusLabel.Position = UDim2.new(0, 10, 0, 214)
+statusLabel.Size = UDim2.new(1, -20, 0, 44)
+statusLabel.Position = UDim2.new(0, 10, 0, 242)
 statusLabel.BackgroundTransparency = 1
 statusLabel.TextColor3 = Color3.fromRGB(140, 220, 165)
 statusLabel.Font = Enum.Font.Gotham
 statusLabel.TextSize = 11
 statusLabel.TextWrapped = true
 statusLabel.TextXAlignment = Enum.TextXAlignment.Left
-statusLabel.Text = hasFs and "Ready." or "Warning: writefile/makefolder missing."
+statusLabel.Text = hasFs
+	and (decompileFn and "Ready (decompiler detected)." or "Ready (no decompiler global found; .Source fallback).")
+	or "Warning: writefile/makefolder missing."
 statusLabel.Parent = frame
 
 dumpBtn.MouseButton1Click:Connect(function()
 	dumpBtn.Active = false
 	dumpBtn.Text = "Dumping..."
 	task.spawn(function()
-		runFileDump(nameBox.Text, dirBox.Text, statusLabel)
+		runFileDump(nameBox.Text, dirBox.Text, selectedScope, statusLabel)
 		dumpBtn.Text = "Dump Files & Folders"
 		dumpBtn.Active = true
 	end)
