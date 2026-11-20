@@ -14,3 +14,8 @@ loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/ref
 ```
 loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/Spin2Upgrade.lua"))()
 ```
+
+### Orbit
+```
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/main/OrbitAutoPlay.lua"))()
+```
