@@ -1,6 +1,8 @@
 just a comp of things slop
 run this to load the menu
-```loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/loader/Xed%20MENU.lua"))()```
+```
+loadstring(game:HttpGet("https://raw.githubusercontent.com/ItsXedy/xLUA-test/refs/heads/loader/Xed%20MENU.lua"))()
+```
 
 ### vulnerable
 ```
